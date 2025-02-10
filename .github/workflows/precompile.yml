@@ -56,13 +56,14 @@ jobs:
     runs-on: ${{ matrix.job.runs-on }}
     env:
       MIX_ENV: prod
-      ELIXIR_VERSION: "1.16"
+      ELIXIR_VERSION: "1.16.0"
+      OTP_VERSION: ${{ matrix.job.otp_version }}
       CC_PRECOMPILER_PRECOMPILE_ONLY_LOCAL: "true"
     strategy:
       matrix:
         job:
-          - { otp_version: "25.3", runs-on: macos-13, arch: "x86_64" }
-          - { otp_version: "25.3", runs-on: macos-14, arch: "aarch64" }
+          - { otp_version: "25.3.2.8", runs-on: macos-13, arch: "x86_64" }
+          - { otp_version: "25.3.2.8", runs-on: macos-14, arch: "aarch64" }
 
     name: ${{ matrix.job.arch }}-apple-drawin - OTP ${{ matrix.job.otp_version }}
 
@@ -70,27 +71,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Erlang and Elixir
+      - name: Install OTP and Elixir
         run: |
-          brew install autoconf coreutils curl git openssl wxwidgets asdf ffmpeg eigen
-          brew link ffmpeg
-          asdf plugin add erlang https://github.com/asdf-vm/asdf-erlang.git
-          asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
-          export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac"
-          asdf install erlang ${{ matrix.job.otp_version }}
-          asdf install elixir ${{ env.ELIXIR_VERSION }}
-          asdf global erlang ${{ matrix.job.otp_version }}
-          asdf global elixir ${{ env.ELIXIR_VERSION }}
-          source $(brew --prefix asdf)/libexec/asdf.sh
-          mix local.hex --force
-          mix local.rebar --force
+          curl -fsSO https://elixir-lang.org/install.sh
+          sh install.sh "elixir@${ELIXIR_VERSION}" "otp@${OTP_VERSION}"
 
       - name: Precompile
         run: |
-          source $(brew --prefix asdf)/libexec/asdf.sh
+          export OTP_MAIN_VER="${OTP_VERSION%%.*}"
+          export PATH=$HOME/.elixir-install/installs/otp/${OTP_VERSION}/bin:$PATH
+          export PATH=$HOME/.elixir-install/installs/elixir/${ELIXIR_VERSION}-otp-${OTP_MAIN_VER}/bin:$PATH
 
           export ELIXIR_MAKE_CACHE_DIR=$(pwd)/cache
           mkdir -p "${ELIXIR_MAKE_CACHE_DIR}"
+
+          mix local.hex --force
+          mix local.rebar --force
+          
           mix deps.get
           mix elixir_make.precompile
 
